@@ -2,7 +2,8 @@ import datetime
 import queue
 import threading
 
-import PySimpleGUI as sg
+import tkinter as tk
+from tkinter import filedialog, messagebox
 import sounddevice as sd
 import soundfile as sf
 
@@ -34,7 +35,7 @@ class Recorder:
                     while self.recording:
                         file.write(self.q.get())
             except Exception as e:
-                sg.popup_error(f"Error during recording:\n{e}")
+                messagebox.showerror("Recording Error", str(e))
 
     def start(self, filename):
         if self.recording:
@@ -51,40 +52,49 @@ class Recorder:
 
 
 def main():
-    sg.theme("DarkBlue")
-    layout = [
-        [
-            sg.Text("Output file:"),
-            sg.InputText("output.wav", key="FILE"),
-            sg.FileSaveAs(file_types=(("WAV", "*.wav"),)),
-        ],
-        [
-            sg.Button("Start Recording", key="-START-"),
-            sg.Button("Stop Recording", key="-STOP-", disabled=True),
-        ],
-    ]
-    window = sg.Window("WinSoundCapture", layout)
+    root = tk.Tk()
+    root.title("WinSoundCapture")
+
+    file_var = tk.StringVar(value="output.wav")
+
+    tk.Label(root, text="Output file:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    file_entry = tk.Entry(root, textvariable=file_var, width=40)
+    file_entry.grid(row=0, column=1, padx=5, pady=5)
+
+    def browse():
+        filename = filedialog.asksaveasfilename(defaultextension=".wav", filetypes=[("WAV files", "*.wav")])
+        if filename:
+            file_var.set(filename)
+
+    tk.Button(root, text="Browse", command=browse).grid(row=0, column=2, padx=5, pady=5)
 
     recorder = Recorder()
 
-    while True:
-        event, values = window.read()
-        if event == sg.WINDOW_CLOSED:
-            break
-        elif event == "-START-":
-            filename = values["FILE"]
-            if not filename:
-                filename = f"recording_{datetime.datetime.now():%Y%m%d_%H%M%S}.wav"
-            recorder.start(filename)
-            window["-START-"].update(disabled=True)
-            window["-STOP-"].update(disabled=False)
-        elif event == "-STOP-":
-            recorder.stop()
-            window["-START-"].update(disabled=False)
-            window["-STOP-"].update(disabled=True)
+    def start_recording():
+        filename = file_var.get().strip()
+        if not filename:
+            filename = f"recording_{datetime.datetime.now():%Y%m%d_%H%M%S}.wav"
+            file_var.set(filename)
+        recorder.start(filename)
+        start_btn.config(state=tk.DISABLED)
+        stop_btn.config(state=tk.NORMAL)
 
-    recorder.stop()
-    window.close()
+    def stop_recording():
+        recorder.stop()
+        start_btn.config(state=tk.NORMAL)
+        stop_btn.config(state=tk.DISABLED)
+
+    start_btn = tk.Button(root, text="Start Recording", command=start_recording)
+    start_btn.grid(row=1, column=0, padx=5, pady=5)
+    stop_btn = tk.Button(root, text="Stop Recording", state=tk.DISABLED, command=stop_recording)
+    stop_btn.grid(row=1, column=1, padx=5, pady=5)
+
+    def on_close():
+        recorder.stop()
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
+    root.mainloop()
 
 
 if __name__ == "__main__":
