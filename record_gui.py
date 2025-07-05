@@ -25,17 +25,23 @@ class Recorder:
         with sf.SoundFile(filename, mode="w", samplerate=self.fs, channels=self.channels) as file:
             try:
                 with sd.InputStream(
-                    samplerate=self.fs,
-                    channels=self.channels,
-                    dtype="float32",
-                    callback=self._callback,
-                    blocksize=1024,
-                    extra_settings=sd.WasapiSettings(loopback=True),
+                        samplerate=self.fs,
+                        channels=self.channels,
+                        dtype="float32",
+                        callback=self._callback,
+                        blocksize=1024,
+                        device=self._get_loopback_device()
                 ):
                     while self.recording:
                         file.write(self.q.get())
             except Exception as e:
                 messagebox.showerror("Recording Error", str(e))
+
+    def _get_loopback_device(self):
+        for i, dev in enumerate(sd.query_devices()):
+            if 'loopback' in dev['name'].lower():
+                return i
+        raise RuntimeError("Nessun dispositivo di loopback trovato.")
 
     def start(self, filename):
         if self.recording:
